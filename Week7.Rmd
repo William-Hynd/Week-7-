@@ -1,0 +1,144 @@
+---
+title: "Week 7 Workshop"
+author: "William Hynd"
+date: "12/11/2020"
+output:  
+  bookdown::html_document2: default
+  bookdown::pdf_document2: default
+  bookdown::word_document2: default
+bibliography: References.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, 
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.retina = 3)
+```
+
+
+```{r packages}
+#Install Tidy verse
+library(tidyverse)
+```
+
+Introduction
+Welcome to the R party. We are gonna talk about chaffinches. Here is an image of a chafinch and some papers. 
+```{R Chaffinch-1, out.height="200px", fig.cap='(ref:Chaffinch1)'}
+knitr::include_graphics("Chaffinch-1.jpg")
+
+```
+
+Methods
+This is a method [@R-core]
+
+Results
+
+Discussion 
+
+
+
+```{r}
+#Read in data set and Tidy data set
+#Import File
+Chaff_Raw <- read_table2("chaff.txt")
+
+#Tidy Data
+Chaff_Tidy <- Chaff_Raw %>%
+  gather(key = sex, value = mass) 
+
+TidyData <- function(df, measure, group) {
+  gather(key = {{group}}, value = {{measure}})
+}
+
+```
+
+
+```{r}
+#Creating a function to find the Mean
+sum_sq <- function(df, measure) {
+  df %>% summarise(ss = sum(({{measure}} - mean({{measure}}))^2))
+}
+
+sum_sq(Chaff_Tidy, mass)
+
+#To Allow analysis of both variables (Sex and Mass) we must use a pipeline. Here we can use {{}} to separate and specify the groups at separate stages. This is used to account for tidyverse's use of 'tidy evaluation'. 
+
+sum_sq2 <- function(df, measure, group) {
+  df %>% group_by({{ group }}) %>% 
+    summarise(ss = sum(({{measure}} - mean({{measure}}))^2))
+}
+
+sum_sq2(Chaff_Tidy, mass, sex)
+```
+
+```{r}
+#Summarize Data set
+
+Chaff_Sum <- Chaff_Tidy %>% 
+  group_by(sex) %>% 
+  summarise(mean_max = mean(mass),
+            n = length(mass),
+            Sd = sd(mass),
+            Se = plotrix::std.error(mass))
+
+
+data_Summarise <- function(df, measure, group) {
+  df %>% group_by({{group}}) %>% 
+  summarise(mean_value = mean({{measure}}),
+            n = length({{measure}}),
+            Sd_max = sd({{measure}}),
+              Se_max = plotrix::std.error({{measure}}))
+}
+
+data_Summarise(Chaff_Tidy, mass, sex)
+```
+
+#Task 2
+```{r}
+#Read in data 
+Mesen_Raw <- ("https://3mmarand.github.io/BIO00058M-Data-science-2020/data-raw/Y101_Y102_Y201_Y202_Y101-5.csv")
+#Tidy data set
+```
+<!-- skip first two lines -->
+```{r}
+sol <- read_csv(Mesen_Raw , skip = 2) %>% 
+  janitor::clean_names()
+```
+
+<!-- filter the data to keep human proteins identified by more than one peptide/delete those where less than two are deleted -->
+```{r}
+sol <- sol %>% 
+  filter(str_detect(description,
+                    "OS=Homo sapiens")) %>% 
+  filter(x1pep == "x")
+```
+
+<!-- extract the gene name from the description and put into a column -->
+```{r}
+sol <- sol %>%
+  mutate(genename =  str_extract(description,"GN=[^\\s]+") %>% 
+           str_replace("GN=", ""))
+```
+
+<!-- extract top protein identifier and put into a column called protid -->
+```{r}
+sol <- sol %>%
+  mutate(protid =  str_extract(accession, ".::[^|;]+") %>% 
+           str_replace(".::", ""))
+```
+
+```{r}
+sol2 <- sol %>% 
+  pivot_longer(names_to = "lineage_rep", 
+               values_to = "abndance",
+               cols = -c(accession, peptide_count, unique_peptides, confidence_score, anova_p, q_value, max_fold_change, power, highest_mean_condition, lowest_mean_condition, mass, description, x1pep, genename, protid))
+```
+
+<!-- create 2 separate columns -->
+```{r}
+sol3 <- sol2 %>% 
+  extract("lineage_rep", 
+          c("lineage", "rep"),
+          "(y[0-9]{3,4})\\_([a-z])")
+```
